@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Checkbox, 
@@ -16,6 +15,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import PaymentIcon from '@mui/icons-material/Payment';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import LogoutIcon from '@mui/icons-material/Logout'; // Added import for logout icon
 import { useNavigate } from 'react-router'; // Import for navigation
 import CustomerMenuData from '../../components/customerComponents/CustomerMenuData';
 
@@ -84,6 +84,12 @@ const MenuPage = () => {
     }
   };
 
+  // Logout handler function
+  const handleLogout = () => {
+    // You can add any logout logic here if needed (like clearing tokens, etc.)
+    navigate('/Signup1'); // Navigate to Signup1 page
+  };
+
   return (
     <Box
       sx={{
@@ -147,8 +153,24 @@ const MenuPage = () => {
         >
           Make Reservation
         </Button>
+
+        {/* Logout Button - ADDED THIS */}
+        <Button
+          variant="contained"
+          startIcon={<LogoutIcon />}
+          sx={{
+            backgroundColor: '#f44336',
+            '&:hover': {
+              backgroundColor: '#d32f2f',
+            },
+          }}
+          onClick={handleLogout} // Navigate to Signup1 page
+        >
+          Logout
+        </Button>
       </Box>
 
+      {/* Rest of your code remains exactly the same */}
       {/* Main Content Area */}
       <Box sx={{ display: 'flex', gap: 4, width: '100%', maxWidth: '1200px', alignItems: 'flex-start' }}>
         {/* Order Status Box - Left of Menu (Half width of menu) */}
