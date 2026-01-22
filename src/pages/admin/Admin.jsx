@@ -1,5 +1,5 @@
-
 import React, { useState } from "react";
+import LogoutIcon from "@mui/icons-material/Logout";
 import {
   Button,
   Typography,
@@ -17,27 +17,31 @@ import {
   Badge,
   Stack,
 } from "@mui/material";
-import { 
-  Delete, 
-  Edit, 
-  Add, 
-  Fastfood, 
-  Restaurant, 
-  LocalBar, 
-  Cake, 
-  Feedback, 
-  Star, 
-  Person, 
+import {
+  Delete,
+  Edit,
+  Add,
+  Fastfood,
+  Restaurant,
+  LocalBar,
+  Cake,
+  Feedback,
+  Star,
+  Person,
   TableBar,
   AccessTime,
   CheckCircle,
   Pending,
-  Cancel
+  Cancel,
 } from "@mui/icons-material";
 import MenuData from "../../components/adminComponents/MenuData";
+import ViewFeedbacksDialog from "../feedback/ViewFeedbackDialog";
+import CreateMenuDialog from "../../components/adminComponents/CreateMenuDialog";
+import { useNavigate } from "react-router";
 
 const Admin = () => {
   const [selectedMenu, setSelectedMenu] = useState(null);
+  const navigate = useNavigate();
   const [menuData, setMenuData] = useState([
     {
       id: 1,
@@ -95,37 +99,103 @@ const Admin = () => {
   const [openModal, setOpenModal] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
 
-
   const reservations = [
-    { id: 1, customer: "John Doe", time: "7:00 PM", table: "T-12", guests: 4, status: "confirmed" },
-    { id: 2, customer: "Jane Smith", time: "7:30 PM", table: "T-05", guests: 2, status: "pending" },
-    { id: 3, customer: "Mike Johnson", time: "8:00 PM", table: "T-08", guests: 6, status: "confirmed" },
-    { id: 4, customer: "Sarah Wilson", time: "8:30 PM", table: "T-03", guests: 3, status: "cancelled" },
-    { id: 5, customer: "David Brown", time: "9:00 PM", table: "T-15", guests: 5, status: "confirmed" },
+    {
+      id: 1,
+      customer: "John Doe",
+      time: "7:00 PM",
+      table: "T-12",
+      guests: 4,
+      status: "confirmed",
+    },
+    {
+      id: 2,
+      customer: "Jane Smith",
+      time: "7:30 PM",
+      table: "T-05",
+      guests: 2,
+      status: "pending",
+    },
+    {
+      id: 3,
+      customer: "Mike Johnson",
+      time: "8:00 PM",
+      table: "T-08",
+      guests: 6,
+      status: "confirmed",
+    },
+    {
+      id: 4,
+      customer: "Sarah Wilson",
+      time: "8:30 PM",
+      table: "T-03",
+      guests: 3,
+      status: "cancelled",
+    },
+    {
+      id: 5,
+      customer: "David Brown",
+      time: "9:00 PM",
+      table: "T-15",
+      guests: 5,
+      status: "confirmed",
+    },
   ];
 
   const feedbacks = [
-    { id: 1, customer: "John Doe", rating: 5, comment: "Excellent food and service!", date: "2024-01-15" },
-    { id: 2, customer: "Jane Smith", rating: 4, comment: "Good experience but waiting time was long", date: "2024-01-14" },
-    { id: 3, customer: "Mike Johnson", rating: 5, comment: "Best restaurant in town!", date: "2024-01-13" },
-    { id: 4, customer: "Sarah Wilson", rating: 3, comment: "Food was good but too expensive", date: "2024-01-12" },
+    {
+      id: 1,
+      customer: "John Doe",
+      rating: 5,
+      comment: "Excellent food and service!",
+      date: "2024-01-15",
+    },
+    {
+      id: 2,
+      customer: "Jane Smith",
+      rating: 4,
+      comment: "Good experience but waiting time was long",
+      date: "2024-01-14",
+    },
+    {
+      id: 3,
+      customer: "Mike Johnson",
+      rating: 5,
+      comment: "Best restaurant in town!",
+      date: "2024-01-13",
+    },
+    {
+      id: 4,
+      customer: "Sarah Wilson",
+      rating: 3,
+      comment: "Food was good but too expensive",
+      date: "2024-01-12",
+    },
   ];
 
   const getStatusIcon = (status) => {
-    switch(status) {
-      case "confirmed": return <CheckCircle sx={{ color: "#4CAF50", fontSize: 16 }} />;
-      case "pending": return <Pending sx={{ color: "#FF9800", fontSize: 16 }} />;
-      case "cancelled": return <Cancel sx={{ color: "#F44336", fontSize: 16 }} />;
-      default: return <CheckCircle sx={{ color: "#4CAF50", fontSize: 16 }} />;
+    switch (status) {
+      case "confirmed":
+        return <CheckCircle sx={{ color: "#4CAF50", fontSize: 16 }} />;
+      case "pending":
+        return <Pending sx={{ color: "#FF9800", fontSize: 16 }} />;
+      case "cancelled":
+        return <Cancel sx={{ color: "#F44336", fontSize: 16 }} />;
+      default:
+        return <CheckCircle sx={{ color: "#4CAF50", fontSize: 16 }} />;
     }
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case "confirmed": return "#4CAF50";
-      case "pending": return "#FF9800";
-      case "cancelled": return "#F44336";
-      default: return "#4CAF50";
+    switch (status) {
+      case "confirmed":
+        return "#4CAF50";
+      case "pending":
+        return "#FF9800";
+      case "cancelled":
+        return "#F44336";
+      default:
+        return "#4CAF50";
     }
   };
 
@@ -143,55 +213,16 @@ const Admin = () => {
     setOpenModal(true);
   };
 
-  const handleCloseModal = () => setOpenModal(false);
-
-  // Handle Save: Add/Edit Menu and Items
-  const handleSave = () => {
-    if (currentMenu) {
-      // Edit menu
-      setMenuData(
-        menuData.map((menu) =>
-          menu.id === currentMenu.id
-            ? { ...menu, name: menuName, items: items }
-            : menu
-        )
-      );
-    } else {
-      // Add new menu
-      const newId = menuData.length + 1;
-      setMenuData([...menuData, { 
-        id: newId, 
-        name: menuName, 
-        icon: <Fastfood />,
-        color: "#45B7D1",
-        items: items 
-      }]);
-    }
-    setOpenModal(false);
-  };
-
-  // Add new item in the modal
-  const handleAddItem = () => {
-    setItems([...items, { name: "", price: "" }]);
-  };
-
-  // Remove an item from the modal
-  const handleRemoveItem = (index) => {
-    const newItems = items.filter((_, i) => i !== index);
-    setItems(newItems);
-  };
-
-  // Handle item name/price changes in the modal
-  const handleItemChange = (index, field, value) => {
-    const updatedItems = items.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    );
-    setItems(updatedItems);
-  };
-
   // Get selected category
 
-  const averageRating = feedbacks.reduce((acc, feedback) => acc + feedback.rating, 0) / feedbacks.length;
+  const averageRating =
+    feedbacks.reduce((acc, feedback) => acc + feedback.rating, 0) /
+    feedbacks.length;
+
+  const logoutfn = () => {
+    localStorage.clear();
+    navigate("/");
+  };
 
   return (
     <Box
@@ -222,26 +253,21 @@ const Admin = () => {
           </Typography>
 
           <Badge badgeContent={feedbacks.length} color="error">
-            <Button
-              variant="contained"
-              startIcon={<Feedback />}
-              sx={{
-                background: "linear-gradient(to right, #FF9800, #FFB74D)",
-                borderRadius: 3,
-                fontWeight: "bold",
-                px: 4,
-                py: 1.5,
-                fontSize: "1rem",
-                boxShadow: "0 4px 15px rgba(255, 152, 0, 0.3)",
-                "&:hover": {
-                  background: "linear-gradient(to right, #F57C00, #FFA726)",
-                  boxShadow: "0 6px 20px rgba(255, 152, 0, 0.4)",
-                },
-              }}
-            >
-              View Feedbacks
-            </Button>
+            <ViewFeedbacksDialog />
           </Badge>
+          <Button
+            variant="contained"
+            startIcon={<LogoutIcon />}
+            sx={{
+              backgroundColor: "#f44336",
+              "&:hover": {
+                backgroundColor: "#d32f2f",
+              },
+            }}
+            onClick={logoutfn}
+          >
+            Logout
+          </Button>
         </Box>
 
         <Grid container spacing={3}>
@@ -290,7 +316,7 @@ const Admin = () => {
                       padding: 2,
                       borderRadius: 2,
                       borderLeft: `4px solid ${getStatusColor(
-                        reservation.status
+                        reservation.status,
                       )}`,
                       backgroundColor: "#f9f9f9",
                     }}
@@ -408,29 +434,13 @@ const Admin = () => {
                 </Box>
 
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => handleOpenModal()}
-                    sx={{
-                      background: "linear-gradient(to right, #FF6B6B, #FF8E53)",
-                      borderRadius: 2,
-                      fontWeight: "bold",
-                      px: 3,
-                      "&:hover": {
-                        background:
-                          "linear-gradient(to right, #FF5252, #FF7B3A)",
-                      },
-                    }}
-                  >
-                    Add Category
-                  </Button>
+                  <CreateMenuDialog />
                 </Box>
               </Box>
               {/* Menu Items Data */}
               <MenuData
-               open={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
               />
 
               {/* Action Buttons */}
@@ -547,7 +557,7 @@ const Admin = () => {
                     <Typography variant="h3" sx={{ fontWeight: "bold", mb: 1 }}>
                       {menuData.reduce(
                         (acc, menu) => acc + menu.items.length,
-                        0
+                        0,
                       )}
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: "medium" }}>
@@ -599,7 +609,6 @@ const Admin = () => {
       </Box>
 
       {/* Modal for Create/Edit Menu */}
-     
     </Box>
   );
 };

@@ -7,6 +7,8 @@ import KitchenStaffDashboard from './pages/kitchenStaff/Kitchenstaff1'
 import Admin from './pages/admin/Admin'
 import ReservationPage from './pages/reservation/Reservation1'
 import FeedbackPage from './pages/feedback/FeedbackPage' // Add this import
+import InventoryStatus from './pages/inventorytracker/Inventorytracker'
+import OrderDashboard from './pages/ordermanagement/Ordermanagement'
 
 function AppRoutes() {
   return (
@@ -18,6 +20,9 @@ function AppRoutes() {
       <Route path="/admin" element={<Admin/>} />
       <Route path="/reservation" element={<ReservationPage/>} />
       <Route path="/feedback" element={<FeedbackPage/>} /> {/* Add this route */}
+       <Route path="/InventoryStatus" element={<InventoryStatus/>} />  
+      <Route path="/OrderDashboard" element={<OrderDashboard/>} /> 
+
     </Routes>
   )
 }

@@ -9,12 +9,11 @@ import {
   Paper,
   Grid,
   IconButton,
-  Divider,
-  Avatar,
-  Chip,
   LinearProgress,
   Card,
-  CardContent
+  CardContent,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import { useNavigate } from 'react-router';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -30,17 +29,22 @@ import EmojiFoodBeverageIcon from '@mui/icons-material/EmojiFoodBeverage';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 
+const API_BASE_URL = 'http://localhost:7001/api';
+
 const FeedbackPage = () => {
   const navigate = useNavigate();
   const [rating, setRating] = useState(0);
   const [foodQuality, setFoodQuality] = useState(0);
-  const [serviceQuality, setServiceQuality] = useState(0);
+  const [service, setService] = useState(0);
   const [cleanliness, setCleanliness] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [emojiRating, setEmojiRating] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const emojiOptions = [
     { icon: <SentimentVeryDissatisfiedIcon fontSize="large" />, label: 'Very Bad', value: 1 },
@@ -50,32 +54,68 @@ const FeedbackPage = () => {
     { icon: <SentimentVerySatisfiedIcon fontSize="large" />, label: 'Excellent', value: 5 },
   ];
 
+  const emojiToExperienceMap = {
+    1: 'very bad',
+    2: 'bad',
+    3: 'okay',
+    4: 'good',
+    5: 'excellent'
+  };
+
   const categories = [
     { label: 'Food Quality', value: foodQuality, setter: setFoodQuality, icon: <LocalDiningIcon />, color: '#FF6B6B' },
-    { label: 'Service', value: serviceQuality, setter: setServiceQuality, icon: <EmojiFoodBeverageIcon />, color: '#45B7D1' },
+    { label: 'Service', value: service, setter: setService, icon: <EmojiFoodBeverageIcon />, color: '#45B7D1' },
     { label: 'Cleanliness', value: cleanliness, setter: setCleanliness, icon: <CleaningServicesIcon />, color: '#96CEB4' },
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Here you would typically send the feedback to your backend
-    console.log({
-      rating,
-      foodQuality,
-      serviceQuality,
-      cleanliness,
-      feedback,
-      name,
-      email,
-      emojiRating
-    });
-    setSubmitted(true);
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      navigate('/customer');
-    }, 3000);
+    setError('');
+    setLoading(true);
+
+    // Map emoji rating to overallExperience
+    const overallExperience = emojiToExperienceMap[emojiRating] || 'okay';
+
+    // Prepare data according to API schema
+    const feedbackData = {
+      overallExperience: overallExperience,
+      foodQuality: foodQuality,
+      service: service,
+      cleanliness: cleanliness,
+      name: name,
+      email: email,
+      feedback: feedback
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/feedback/createFeedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(feedbackData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSuccess(true);
+        setSubmitted(true);
+        
+        // Reset form after 3 seconds
+        setTimeout(() => {
+          setSubmitted(false);
+          navigate('/customer');
+        }, 3000);
+      } else {
+        setError(result.error || 'Failed to submit feedback');
+      }
+    } catch (err) {
+      setError('Network error. Please check if the server is running.');
+      console.error('Error submitting feedback:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getEmojiLabel = (value) => {
@@ -92,6 +132,28 @@ const FeedbackPage = () => {
         px: 2,
       }}
     >
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError('')} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar 
+        open={success} 
+        autoHideDuration={3000} 
+        onClose={() => setSuccess(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccess(false)} severity="success" sx={{ width: '100%' }}>
+          Feedback submitted successfully!
+        </Alert>
+      </Snackbar>
+
       <Container maxWidth="md">
         <Paper
           elevation={10}
@@ -260,6 +322,7 @@ const FeedbackPage = () => {
                           variant="outlined"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
+                          required
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -275,6 +338,7 @@ const FeedbackPage = () => {
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
+                          required
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -292,6 +356,7 @@ const FeedbackPage = () => {
                           value={feedback}
                           onChange={(e) => setFeedback(e.target.value)}
                           placeholder="What did you like? What can we improve?"
+                          required
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -328,7 +393,7 @@ const FeedbackPage = () => {
                   <Button
                     type="submit"
                     variant="contained"
-                    disabled={!emojiRating}
+                    disabled={!emojiRating || loading}
                     sx={{
                       px: 4,
                       py: 1.5,
@@ -339,9 +404,12 @@ const FeedbackPage = () => {
                         background: 'linear-gradient(to right, #FF5252, #FF7B3A)',
                         boxShadow: '0 6px 20px rgba(255, 107, 107, 0.4)',
                       },
+                      '&.Mui-disabled': {
+                        background: '#ccc',
+                      },
                     }}
                   >
-                    Submit Feedback
+                    {loading ? 'Submitting...' : 'Submit Feedback'}
                   </Button>
                 </Box>
               </form>
@@ -365,8 +433,7 @@ const FeedbackPage = () => {
             <Grid item xs={6} md={3}>
               <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 3, bgcolor: 'rgba(255, 255, 255, 0.9)' }}>
                 <Typography variant="h6" sx={{ color: '#FF6B6B', fontWeight: 'bold' }}>
-                  
-
+                  4.7
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#666' }}>
                   Average Rating

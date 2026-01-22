@@ -1,108 +1,223 @@
-import React, { useState } from 'react';
-import { 
-  Checkbox, 
-  Button, 
-  Typography, 
-  Box, 
+import React, { useState, useEffect } from "react";
+import {
+  Checkbox,
+  Button,
+  Typography,
+  Box,
   FormControlLabel,
   Paper,
   Divider,
   Badge,
-  LinearProgress
-} from '@mui/material';
-import FeedbackIcon from '@mui/icons-material/Feedback';
-import HistoryIcon from '@mui/icons-material/History';
-import RestaurantIcon from '@mui/icons-material/Restaurant';
-import PaymentIcon from '@mui/icons-material/Payment';
-import ReceiptIcon from '@mui/icons-material/Receipt';
-import LogoutIcon from '@mui/icons-material/Logout'; // Added import for logout icon
-import { useNavigate } from 'react-router'; // Import for navigation
-import CustomerMenuData from '../../components/customerComponents/CustomerMenuData';
+  LinearProgress,
+  IconButton,
+  Chip,
+} from "@mui/material";
+import FeedbackIcon from "@mui/icons-material/Feedback";
+import HistoryIcon from "@mui/icons-material/History";
+import RestaurantIcon from "@mui/icons-material/Restaurant";
+import PaymentIcon from "@mui/icons-material/Payment";
+import ReceiptIcon from "@mui/icons-material/Receipt";
+import LogoutIcon from "@mui/icons-material/Logout";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { useNavigate } from "react-router";
+import axios from "axios";
 
 const MenuPage = () => {
   const [selectedItems, setSelectedItems] = useState([]);
-  const [orderStatus, setOrderStatus] = useState('Not Ordered Yet');
-  const navigate = useNavigate(); // Initialize navigate hook
+  const [orderStatus, setOrderStatus] = useState("Not Ordered Yet");
+  const [menuData, setMenuData] = useState([]);
+  const [tableNumber, setTableNumber] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState();
+  const navigate = useNavigate();
+  const name = localStorage.getItem("name");
+  const storedName = localStorage.getItem("name")?.replace(/"/g, "").trim();
 
-  const menuItems = [
-    { name: 'Appetizers', price: 8.99 },
-    { name: 'Spring Roan', price: 8.99 },
-    { name: 'Garlic Naan', price: 8.99 },
-    { name: 'Caprese', price: 2.99 },
-    { name: 'Caprese Salad', price: 2.99 },
-    { name: 'Chicken Tikka Masala', price: 3.99 },
-    { name: 'Veggi Burger', price: 8.99 },
-    { name: 'Grilled Saimarva', price: 2.99 },
-    { name: 'Chocolate Lava Cake', price: 3.99 },
-    { name: 'Ice Cream Trio', price: 3.09 },
-    { name: 'Apple Pie', price: 3.99 },
-  ];
+  // Fetch menu data
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:7001/api/menu/getAllMenus",
+        );
+        const data = await response.json();
+        setMenuData(data.data || []);
+      } catch (error) {
+        console.error("Error fetching menu:", error);
+      }
+    };
+    fetchMenu();
+  }, []);
 
-  const handleChange = (item) => {
+  // Add item to order
+  const handleAddItem = (categoryName, item) => {
+    setSelectedItems((prev) => {
+      const existingItem = prev.find(
+        (i) => i.itemName === item.itemName && i.category === categoryName,
+      );
+
+      if (existingItem) {
+        return prev.map((i) =>
+          i.itemName === item.itemName && i.category === categoryName
+            ? { ...i, quantity: i.quantity + 1 }
+            : i,
+        );
+      } else {
+        return [
+          ...prev,
+          {
+            itemName: item.itemName,
+            itemPrice: item.itemPrice,
+            category: categoryName,
+            quantity: 1,
+            _id: item._id,
+          },
+        ];
+      }
+    });
+  };
+
+  // Remove one quantity of item
+  const handleRemoveItem = (itemName, category) => {
+    setSelectedItems((prev) => {
+      const existingItem = prev.find(
+        (i) => i.itemName === itemName && i.category === category,
+      );
+
+      if (existingItem.quantity > 1) {
+        return prev.map((i) =>
+          i.itemName === itemName && i.category === category
+            ? { ...i, quantity: i.quantity - 1 }
+            : i,
+        );
+      } else {
+        return prev.filter(
+          (i) => !(i.itemName === itemName && i.category === category),
+        );
+      }
+    });
+  };
+
+  // Remove entire item from order
+  const handleDeleteItem = (itemName, category) => {
     setSelectedItems((prev) =>
-      prev.includes(item)
-        ? prev.filter((i) => i !== item)
-        : [...prev, item]
+      prev.filter((i) => !(i.itemName === itemName && i.category === category)),
     );
   };
 
+  // Calculate total
   const calculateTotal = () => {
-    return selectedItems.reduce((total, itemName) => {
-      const item = menuItems.find(menuItem => menuItem.name === itemName);
-      return total + (item ? item.price : 0);
-    }, 0).toFixed(2);
+    return selectedItems.reduce(
+      (total, item) => total + item.itemPrice * item.quantity,
+      0,
+    );
   };
 
-  const handlePlaceOrder = () => {
-    setOrderStatus('Order Placed');
-    setTimeout(() => setOrderStatus('Preparing'), 1000);
-    setTimeout(() => setOrderStatus('Cooking'), 3000);
-    setTimeout(() => setOrderStatus('Ready to Serve'), 5000);
-    setTimeout(() => setOrderStatus('Served'), 7000);
-  };
+  // Create order API call
+  const handleCreateOrder = async () => {
+    if (selectedItems.length === 0) return;
 
-  const getStatusProgress = () => {
-    switch(orderStatus) {
-      case 'Not Ordered Yet': return 0;
-      case 'Order Placed': return 25;
-      case 'Preparing': return 40;
-      case 'Cooking': return 65;
-      case 'Ready to Serve': return 85;
-      case 'Served': return 100;
-      default: return 0;
+    try {
+      setLoading(true);
+
+      // Structure items by category as per API requirement
+      const itemsByCategory = {};
+
+      selectedItems.forEach((item) => {
+        if (!itemsByCategory[item.category]) {
+          itemsByCategory[item.category] = [];
+        }
+        // Add the item quantity times
+        for (let i = 0; i < item.quantity; i++) {
+          itemsByCategory[item.category].push({
+            itemName: item.itemName,
+            itemPrice: item.itemPrice,
+          });
+        }
+      });
+
+      const orderData = {
+        name: name,
+        tableNumber: tableNumber,
+        items: itemsByCategory,
+        totalPrice: calculateTotal(),
+      };
+
+      console.log("Sending order:", orderData);
+
+      const response = await fetch(
+        "http://localhost:7001/api/orders/createOrder",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(orderData),
+        },
+      );
+       if (response.ok) {
+        const result = await response.json();
+        console.log('Order created successfully:', result);
+        
+        setSelectedItems([]);
+        window.location.reload();
+      } else {
+        console.error('Failed to create order');
+      }
+
+    } catch (error) {
+      console.error("Error creating order:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusColor = () => {
-    switch(orderStatus) {
-      case 'Order Placed': return '#FF6B6B';
-      case 'Preparing': return '#FFA726';
-      case 'Cooking': return '#29B6F6';
-      case 'Ready to Serve': return '#66BB6A';
-      case 'Served': return '#4CAF50';
-      default: return '#9E9E9E';
+
+  const logoutfn = () => {
+    localStorage.clear();
+    navigate("/");
+  };
+
+  // All orders
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        "http://localhost:7001/api/orders/getAllOrders",
+      );
+      if (res.data.success) {
+        setOrders(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching orders:", err);
+    } finally {
+      setLoading(false);
     }
   };
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
-  // Logout handler function
-  const handleLogout = () => {
-    // You can add any logout logic here if needed (like clearing tokens, etc.)
-    navigate('/Signup1'); // Navigate to Signup1 page
-  };
+  const filterOrderOfCustomer = orders?.filter((order) => {
+    if (!order?.name || !storedName) return false;
 
+    return order?.name.replace(/"/g, "").trim() === storedName;
+  });
   return (
     <Box
       sx={{
         backgroundImage: `url('src/assets/background-image.png')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        minHeight: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        color: 'white',
-        padding: '20px',
-        position: 'relative',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        color: "white",
+        padding: "20px",
+        position: "relative",
       }}
     >
       {/* Top Left: Give Feedback Button */}
@@ -110,307 +225,485 @@ const MenuPage = () => {
         variant="contained"
         startIcon={<FeedbackIcon />}
         sx={{
-          position: 'absolute',
+          position: "absolute",
           top: 20,
           left: 20,
-          backgroundColor: '#FF6B6B',
-          '&:hover': {
-            backgroundColor: '#FF5252',
+          backgroundColor: "#FF6B6B",
+          "&:hover": {
+            backgroundColor: "#FF5252",
           },
         }}
-        onClick={() => navigate('/feedback')} // Navigate to feedback page
+        onClick={() => navigate("/feedback")}
       >
         Give Feedback
       </Button>
 
-      {/* Top Right: Order History and Make Reservation */}
-      <Box sx={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: 2 }}>
-        {/* Order History Button */}
+      {/* Top Right: Order History, Make Reservation, and Logout */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 20,
+          right: 20,
+          display: "flex",
+          gap: 2,
+        }}
+      >
         <Button
           variant="contained"
           startIcon={<HistoryIcon />}
           sx={{
-            backgroundColor: '#FF9800',
-            '&:hover': {
-              backgroundColor: '#F57C00',
+            backgroundColor: "#FF9800",
+            "&:hover": {
+              backgroundColor: "#F57C00",
             },
           }}
         >
           Order History
         </Button>
 
-        {/* Make Reservation Button */}
         <Button
           variant="contained"
           startIcon={<RestaurantIcon />}
           sx={{
-            backgroundColor: '#45B7D1',
-            '&:hover': {
-              backgroundColor: '#3AA3C4',
+            backgroundColor: "#45B7D1",
+            "&:hover": {
+              backgroundColor: "#3AA3C4",
             },
           }}
-          onClick={() => navigate('/reservation')} // Navigate to reservation page
+          onClick={() => navigate("/reservation")}
         >
           Make Reservation
         </Button>
 
-        {/* Logout Button - ADDED THIS */}
         <Button
           variant="contained"
           startIcon={<LogoutIcon />}
           sx={{
-            backgroundColor: '#f44336',
-            '&:hover': {
-              backgroundColor: '#d32f2f',
+            backgroundColor: "#f44336",
+            "&:hover": {
+              backgroundColor: "#d32f2f",
             },
           }}
-          onClick={handleLogout} // Navigate to Signup1 page
+          onClick={logoutfn}
         >
           Logout
         </Button>
       </Box>
 
-      {/* Rest of your code remains exactly the same */}
       {/* Main Content Area */}
-      <Box sx={{ display: 'flex', gap: 4, width: '100%', maxWidth: '1200px', alignItems: 'flex-start' }}>
-        {/* Order Status Box - Left of Menu (Half width of menu) */}
-        <Paper
-          elevation={6}
-          sx={{
-            width: '200px', // Half of menu width (400px)
-            padding: '15px',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)', // Black background
-            borderRadius: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            color: 'white',
-            minHeight: '400px',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <ReceiptIcon sx={{ color: '#4CAF50', mr: 1 }} />
-            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 'bold' }}>
-              Order Status
-            </Typography>
-          </Box>
-          
-          <Divider sx={{ backgroundColor: '#444', mb: 3 }} />
-          
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Badge
-              color="primary"
-              variant="dot"
-              sx={{ mb: 2 }}
-            >
-              <Typography
-                variant="h5"
-                sx={{
-                  color: getStatusColor(),
-                  fontWeight: 'bold',
-                  fontSize: '1.2rem',
-                }}
-              >
-                {orderStatus}
-              </Typography>
-            </Badge>
-          </Box>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 4,
+          width: "100%",
+          maxWidth: "1200px",
+          alignItems: "flex-start",
+        }}
+      >
+        {/* Order Status Box - Left */}
+<Paper
+  elevation={8}
+  sx={{
+    width: 260,
+    p: 2,
+    background: "linear-gradient(180deg, #111, #1c1c1c)",
+    borderRadius: 3,
+    color: "white",
+    minHeight: 420,
+  }}
+>
+  {/* Header */}
+  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+    <ReceiptIcon sx={{ color: "#4CAF50", mr: 1 }} />
+    <Typography fontWeight="bold">Order Status</Typography>
+  </Box>
 
-          {/* Progress Bar */}
-          <Box sx={{ width: '100%', mb: 3 }}>
-            <LinearProgress 
-              variant="determinate" 
-              value={getStatusProgress()} 
-              sx={{ 
-                height: 10, 
-                borderRadius: 5,
-                backgroundColor: '#333',
-                '& .MuiLinearProgress-bar': {
-                  backgroundColor: getStatusColor(),
-                }
-              }} 
-            />
-            <Typography variant="caption" sx={{ color: '#aaa', fontSize: '0.75rem', mt: 1, display: 'block', textAlign: 'center' }}>
-              {getStatusProgress()}% Complete
-            </Typography>
-          </Box>
+  <Divider sx={{ mb: 2, bgcolor: "#333" }} />
 
-          <Typography variant="body2" sx={{ color: '#ccc', textAlign: 'center', fontSize: '0.85rem' }}>
-            {orderStatus === 'Not Ordered Yet' && 'Select items and click "Place Order"'}
-            {orderStatus === 'Order Placed' && 'Your order has been received'}
-            {orderStatus === 'Preparing' && 'Chef is preparing your ingredients'}
-            {orderStatus === 'Cooking' && 'Your food is being cooked'}
-            {orderStatus === 'Ready to Serve' && 'Your order is ready to serve'}
-            {orderStatus === 'Served' && 'Enjoy your meal!'}
+  {/* Orders */}
+  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+    {filterOrderOfCustomer?.map((order, index) => (
+      <Paper
+        key={order._id}
+        elevation={3}
+        sx={{
+          p: 1.5,
+          borderRadius: 2,
+          backgroundColor: "#222",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Box>
+          <Typography fontSize={13} color="#aaa">
+            Order #{index + 1}
           </Typography>
-        </Paper>
+        </Box>
 
-        {/* Menu Box - Center (Main Menu) */}
+        <Chip
+          label={order.status}
+          size="small"
+          sx={{
+            textTransform: "capitalize",
+            bgcolor:
+              order.status === "pending"
+                ? "#ff9800"
+                : order.status === "preparing"
+                ? "#2196f3"
+                : "#4caf50",
+            color: "white",
+            fontWeight: 500,
+          }}
+        />
+      </Paper>
+    ))}
+  </Box>
+</Paper>
+
+
+        {/* Menu Box - Center */}
         <Box
           sx={{
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '25px',
-            // width: '400px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+            borderRadius: "12px",
+            padding: "25px",
+            width: "400px",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
           }}
         >
-          <Typography variant="h5" sx={{ 
-            marginBottom: '20px', 
-            color: '#2C3E50',
-            fontWeight: 'bold',
-            textAlign: 'center'
-          }}>
+          <Typography
+            variant="h5"
+            sx={{
+              marginBottom: "20px",
+              color: "#2C3E50",
+              fontWeight: "bold",
+              textAlign: "center",
+            }}
+          >
             🍽️ Restaurant Menu
           </Typography>
 
-          <CustomerMenuData/>
+          {/* Menu Display with Categories */}
+          <Box sx={{ maxHeight: "400px", overflowY: "auto", pr: 1 }}>
+            {menuData.map((category) => (
+              <Box key={category._id} sx={{ mb: 3 }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: "#34495E",
+                    mb: 2,
+                    pb: 1,
+                    borderBottom: "2px solid #3498db",
+                    fontSize: "1rem",
+                  }}
+                >
+                  {category.categoryName}
+                </Typography>
+
+                {category.menuItems.map((item) => {
+                  const isSelected = selectedItems.find(
+                    (si) =>
+                      si.itemName === item.itemName &&
+                      si.category === category.categoryName,
+                  );
+
+                  return (
+                    <Button
+                      key={item._id}
+                      fullWidth
+                      variant={isSelected ? "contained" : "outlined"}
+                      onClick={() => handleAddItem(category.categoryName, item)}
+                      sx={{
+                        mb: 1,
+                        justifyContent: "space-between",
+                        py: 1,
+                        borderRadius: "8px",
+                        backgroundColor: isSelected ? "#e3f2fd" : "transparent",
+                        borderColor: isSelected ? "#1976d2" : "#ddd",
+                        "&:hover": {
+                          backgroundColor: isSelected ? "#bbdefb" : "#f5f5f5",
+                        },
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "0.85rem",
+                          textTransform: "none",
+                          textAlign: "left",
+                          flex: 1,
+                        }}
+                      >
+                        {item.itemName}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.85rem",
+                          fontWeight: "bold",
+                          color: isSelected ? "#1976d2" : "#2c3e50",
+                        }}
+                      >
+                        ${item.itemPrice}
+                      </Typography>
+                    </Button>
+                  );
+                })}
+              </Box>
+            ))}
+          </Box>
+
+          {/* Table Number Selection */}
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2, mt: 2 }}>
+            <Typography sx={{ mr: 2, color: "#2C3E50", fontSize: "0.9rem" }}>
+              Table:
+            </Typography>
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              {[1, 2, 3, 4, 5].map((num) => (
+                <Button
+                  key={num}
+                  variant={tableNumber === num ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => setTableNumber(num)}
+                  sx={{
+                    minWidth: "30px",
+                    height: "30px",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {num}
+                </Button>
+              ))}
+            </Box>
+          </Box>
 
           <Divider sx={{ my: 2 }} />
-
-          {/* Order Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            fullWidth
-            onClick={handlePlaceOrder}
-            disabled={selectedItems.length === 0}
-            sx={{ 
-              py: 1.5,
-              fontSize: '1rem',
-              fontWeight: 'bold',
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
-              '&:hover': {
-                boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
-              }
-            }}
-          >
-            Place Order ({selectedItems.length} items)
-          </Button>
         </Box>
 
-        {/* Right Panel - Total Bill and Pay Bill (Half width of menu) */}
+        {/* Order Summary Box - Right */}
         <Paper
           elevation={6}
           sx={{
-            width: '200px', // Half of menu width (400px)
-            padding: '15px',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)', // Black background
-            borderRadius: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            color: 'white',
-            minHeight: '400px',
+            width: "200px",
+            padding: "15px",
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            borderRadius: "12px",
+            display: "flex",
+            flexDirection: "column",
+            color: "white",
+            minHeight: "400px",
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <PaymentIcon sx={{ color: '#FFD700', mr: 1 }} />
-            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 'bold' }}>
-              Bill Summary
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+            <PaymentIcon sx={{ color: "#FFD700", mr: 1 }} />
+            <Typography variant="h6" sx={{ color: "#fff", fontWeight: "bold" }}>
+              Order Summary
             </Typography>
           </Box>
-          
-          <Divider sx={{ backgroundColor: '#444', mb: 3 }} />
-          
-          {/* Selected Items List */}
-          <Box sx={{ 
-            flexGrow: 1, 
-            mb: 3, 
-            maxHeight: '250px', 
-            overflowY: 'auto',
-            pr: 1,
-            '&::-webkit-scrollbar': {
-              width: '4px',
-            },
-            '&::-webkit-scrollbar-track': {
-              background: '#333',
-              borderRadius: '10px',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              background: '#666',
-              borderRadius: '10px',
-            },
-          }}>
+
+          <Divider sx={{ backgroundColor: "#444", mb: 3 }} />
+
+          {/* Selected Items List with Quantity Controls */}
+          <Box
+            sx={{
+              flexGrow: 1,
+              mb: 3,
+              maxHeight: "250px",
+              overflowY: "auto",
+              pr: 1,
+              "&::-webkit-scrollbar": {
+                width: "4px",
+              },
+              "&::-webkit-scrollbar-track": {
+                background: "#333",
+                borderRadius: "10px",
+              },
+              "&::-webkit-scrollbar-thumb": {
+                background: "#666",
+                borderRadius: "10px",
+              },
+            }}
+          >
             {selectedItems.length === 0 ? (
-              <Typography sx={{ color: '#aaa', textAlign: 'center', fontSize: '0.85rem' }}>
+              <Typography
+                sx={{ color: "#aaa", textAlign: "center", fontSize: "0.85rem" }}
+              >
                 No items selected
               </Typography>
             ) : (
-              selectedItems.map((itemName, index) => {
-                const item = menuItems.find(menuItem => menuItem.name === itemName);
-                return (
-                  <Box key={index} sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    mb: 1.5,
-                    alignItems: 'center'
-                  }}>
-                    <Typography sx={{ fontSize: '0.85rem', color: '#fff' }}>
-                      {item.name}
+              selectedItems.map((item, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    mb: 2,
+                    p: 1,
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {/* Item header row */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "0.8rem",
+                        color: "#fff",
+                        fontWeight: "bold",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {item.itemName}
                     </Typography>
-                    <Typography sx={{ 
-                      fontSize: '0.85rem', 
-                      color: '#4CAF50',
-                      fontWeight: 'bold'
-                    }}>
-                      ${item.price.toFixed(2)}
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        handleDeleteItem(item.itemName, item.category)
+                      }
+                      sx={{ color: "#ff6b6b", p: 0.5, ml: 1 }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+
+                  {/* Quantity controls and price row */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          handleRemoveItem(item.itemName, item.category)
+                        }
+                        sx={{
+                          color: "#fff",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                          p: 0.5,
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.2)",
+                          },
+                        }}
+                      >
+                        <RemoveIcon fontSize="small" />
+                      </IconButton>
+
+                      <Typography
+                        sx={{
+                          fontSize: "0.85rem",
+                          color: "#fff",
+                          minWidth: "24px",
+                          textAlign: "center",
+                        }}
+                      >
+                        {item.quantity}
+                      </Typography>
+
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          handleAddItem(item.category, {
+                            itemName: item.itemName,
+                            itemPrice: item.itemPrice,
+                            _id: item._id,
+                          })
+                        }
+                        sx={{
+                          color: "#fff",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                          p: 0.5,
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.2)",
+                          },
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+
+                    <Typography
+                      sx={{
+                        fontSize: "0.85rem",
+                        color: "#4CAF50",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ${(item.itemPrice * item.quantity).toFixed(2)}
                     </Typography>
                   </Box>
-                );
-              })
+                </Box>
+              ))
             )}
           </Box>
 
-          <Divider sx={{ backgroundColor: '#444', my: 2 }} />
+          <Divider sx={{ backgroundColor: "#444", my: 2 }} />
 
           {/* Total Bill */}
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            mb: 3,
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            padding: '12px',
-            borderRadius: '8px'
-          }}>
-            <Typography variant="h6" sx={{ color: '#fff', fontSize: '1rem' }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 3,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              padding: "12px",
+              borderRadius: "8px",
+            }}
+          >
+            <Typography variant="h6" sx={{ color: "#fff", fontSize: "1rem" }}>
               Total:
             </Typography>
-            <Typography variant="h5" sx={{ 
-              color: '#FFD700', 
-              fontWeight: 'bold',
-              fontSize: '1.4rem'
-            }}>
+            <Typography
+              variant="h5"
+              sx={{
+                color: "#FFD700",
+                fontWeight: "bold",
+                fontSize: "1.4rem",
+              }}
+            >
               ${calculateTotal()}
             </Typography>
           </Box>
 
-          {/* Pay Bill Button */}
+          {/* Create Order Button */}
           <Button
             variant="contained"
             color="success"
             fullWidth
             startIcon={<PaymentIcon />}
-            disabled={selectedItems.length === 0}
+            disabled={selectedItems.length === 0 || loading}
+            onClick={handleCreateOrder}
             sx={{
-              py: 1.5,
-              fontSize: '0.95rem',
-              backgroundColor: '#4CAF50',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              '&:hover': {
-                backgroundColor: '#388E3C',
-                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+              py: 1,
+              fontSize: "0.95rem",
+              backgroundColor: "#4CAF50",
+              borderRadius: "8px",
+              fontWeight: "bold",
+              "&:hover": {
+                backgroundColor: "#388E3C",
+                boxShadow: "0 4px 12px rgba(76, 175, 80, 0.3)",
               },
-              '&.Mui-disabled': {
-                backgroundColor: '#2E7D32',
-                color: 'rgba(255,255,255,0.5)',
-              }
+              "&.Mui-disabled": {
+                backgroundColor: "#2E7D32",
+                color: "rgba(255,255,255,0.5)",
+              },
             }}
           >
-            Pay Bill
+            {loading ? "Creating Order..." : "Create Order"}
           </Button>
         </Paper>
       </Box>
